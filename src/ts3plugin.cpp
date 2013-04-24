@@ -138,6 +138,7 @@ void hlp_enableVad();
 void hlp_disableVad();
 int hlp_getChannel(anyID idClient, float clientArray[], float selfArray[]);
 void hlp_timerThread(void* pArguments);
+void hlp_setMetaData(string data);
 
 void prs_commandText(string &commandText, anyID &idClient);
 void prs_parseREQ(anyID &idClient);
@@ -154,7 +155,7 @@ const char* ts3plugin_name() {
 }
 
 const char* ts3plugin_version() {
-    return "0.5";
+    return "v0.5";
 }
 
 int ts3plugin_apiVersion() {
@@ -171,6 +172,11 @@ const char* ts3plugin_description() {
     return "A2TS Rebuild: This plugin will (not) work.";
 }
 
+const char* ts3plugin_infoTitle() 
+{
+	return "Plugin info";
+}
+
 void ts3plugin_registerPluginID(const char* id) {
 	const size_t sz = strlen(id) + 1;
 	pluginID = (char*)malloc(sz * sizeof(char));
@@ -180,6 +186,11 @@ void ts3plugin_registerPluginID(const char* id) {
 
 void ts3plugin_setFunctionPointers(const struct TS3Functions funcs) {
     ts3Functions = funcs;
+}
+
+void ts3plugin_freeMemory(void* data)
+{
+	free(data);
 }
 
 int ts3plugin_init()
@@ -214,6 +225,10 @@ int ts3plugin_init()
 				}
 
 				connected = TRUE;
+
+				// Set client metadata, publically declaring that we are using this plug-in.
+				string metaData = string(ts3plugin_name()) + " " + string(ts3plugin_version());
+				hlp_setMetaData(metaData);
 			}
 		}
 	}
@@ -364,6 +379,9 @@ void ts3plugin_shutdown()
 	{
 		CloseHandle(clientPipe);
 	}
+
+	// Clear client metadata.
+	hlp_setMetaData("");
 	
 	/* Free pluginID if we registered it */
 	if(pluginID) {
@@ -411,6 +429,10 @@ void ts3plugin_onConnectStatusChangeEvent(uint64 serverConnectionHandlerID, int 
 				incomingMessages.pop();
 			}
 			connected = TRUE;
+
+			// Set client metadata, publically declaring that we are using this plug-in.
+			string metaData = string(ts3plugin_name()) + " " + string(ts3plugin_version());
+			hlp_setMetaData(metaData);
 		}
 		else
 		{
@@ -571,6 +593,37 @@ void ts3plugin_onEditPostProcessVoiceDataEvent(uint64 serverConnectionHandlerID,
 		{
 			RadioNoiseDSP(1.00f, samples, sampleCount);
 		}
+	}
+}
+
+void ts3plugin_infoData(uint64 serverConnectionHandlerID, uint64 id, enum PluginItemType type, char** data)
+{
+	if(connected == TRUE && serverConnectionHandlerID == connectionHandlerID)
+	{
+		char* metaData = "No plug-in detected.";
+
+		switch(type) 
+		{
+			case PLUGIN_CLIENT:
+				if(ts3Functions.getClientVariableAsString(connectionHandlerID, (anyID)id, CLIENT_META_DATA, &metaData) != ERROR_ok)
+				{
+					printf("PLUGIN: Failure querying metadata.\n");
+					return;
+				}
+				break;
+			default:
+				data = NULL;  /* Ignore */
+				return;
+		}
+		
+		if(*metaData == '\0')
+		{
+			metaData = "No plug-in detected.";
+		}
+
+		*data = (char*)malloc(INFODATA_BUFSIZE * sizeof(char));
+		snprintf(*data, INFODATA_BUFSIZE, "[I]\%s\[/I]", metaData);
+		ts3Functions.freeMemory(metaData);
 	}
 }
 
@@ -1058,6 +1111,8 @@ void pos_self()
 
 void vPos_infantry(anyID &idClient)
 {
+	printf("DEBUG: VPOS INFANTRY\n");
+
 	TS3_VECTOR clientPos;
 	QVector3D rel_pos = trans_matrix.map(QVector3D(players[idClient].posX, players[idClient].posY, players[idClient].posZ));
 	clientPos.x = rel_pos.x();
@@ -1083,6 +1138,9 @@ void vPos_infantry(anyID &idClient)
 
 void vPos_vehicle(anyID &idClient) // Узнать почему прыгает позиция.
 {
+	printf("DEBUG: VPOS VEHICLE\n");
+
+
 	int errorCode = 0;
 	TS3_VECTOR othPos;
 
@@ -1135,7 +1193,7 @@ void rPos_clientSW(anyID &idClient, int &channelPos)
 	TS3_VECTOR othPos;
 	int channelPosArray[] = {self->kvPos0, self->kvPos1, self->kvPos2, self->kvPos3};
 
-	othPos.x = (channelPosArray[channelPos] -1) * 10;
+	othPos.x = (channelPosArray[channelPos] -1) * 20;
 	othPos.y = 0;
 	othPos.z = 0;
 
@@ -1156,7 +1214,7 @@ void rPos_clientLW(anyID &idClient, int &channelPos)
 	TS3_VECTOR othPos;
 	int channelPosArray[] = {self->dvPos0, self->dvPos1, self->dvPos2, self->dvPos3};
 
-	othPos.x = channelPosArray[channelPos] - 1 * 10;
+	othPos.x = channelPosArray[channelPos] - 1 * 20;
 	othPos.y = 0;
 	othPos.z = 0;
 
@@ -1390,6 +1448,27 @@ void hlp_timerThread(void* pArguments)
 
 	CloseHandle(timerThreadHndl);
 	timerThreadHndl = INVALID_HANDLE_VALUE;
+}
+
+void hlp_setMetaData(string data)
+{
+	if(ts3Functions.setClientSelfVariableAsString(connectionHandlerID, CLIENT_META_DATA, data.c_str()) == ERROR_ok)
+	{
+		printf("PLUGIN: Metadata set.\n");
+
+		if(ts3Functions.flushClientSelfUpdates(connectionHandlerID, NULL) == ERROR_ok)
+		{
+			printf("PLUGIN: Metadata flush success.\n");
+		}
+		else
+		{
+			printf("PLUGIN: Metadata flush failure.\n");
+		}
+	}
+	else
+	{
+		printf("PLUGIN: Failed to set metadata.\n");
+	}
 }
 /********************************* Helper Functions END ***************************************/
 
@@ -1640,59 +1719,4 @@ void RadioNoiseDSP(float slevel, short * samples, int sampleCount)
 			d = -1;
 		samples[i] = d*(SHRT_MAX-1);
 	}
-}
-
-/*
- * Implement the following three functions when the plugin should display a line in the server/channel/client info.
- * If any of ts3plugin_infoTitle, ts3plugin_infoData or ts3plugin_freeMemory is missing, the info text will not be displayed.
- */
-
-/* Static title shown in the left column in the info frame */
-const char* ts3plugin_infoTitle() {
-	return "A2TS Rebuild v0.5 ";
-}
-
-/*
- * Dynamic content shown in the right column in the info frame. Memory for the data string needs to be allocated in this
- * function. The client will call ts3plugin_freeMemory once done with the string to release the allocated memory again.
- * Check the parameter "type" if you want to implement this feature only for specific item types. Set the parameter
- * "data" to NULL to have the client ignore the info data.
- */
-void ts3plugin_infoData(uint64 serverConnectionHandlerID, uint64 id, enum PluginItemType type, char** data) {
-	char* name;
-
-	/* For demonstration purpose, display the name of the currently selected server, channel or client. */
-	switch(type) {
-		case PLUGIN_SERVER:
-			if(ts3Functions.getServerVariableAsString(serverConnectionHandlerID, VIRTUALSERVER_NAME, &name) != ERROR_ok) {
-				printf("Error getting virtual server name\n");
-				return;
-			}
-			break;
-		case PLUGIN_CHANNEL:
-			if(ts3Functions.getChannelVariableAsString(serverConnectionHandlerID, id, CHANNEL_NAME, &name) != ERROR_ok) {
-				printf("Error getting channel name\n");
-				return;
-			}
-			break;
-		case PLUGIN_CLIENT:
-			if(ts3Functions.getClientVariableAsString(serverConnectionHandlerID, (anyID)id, CLIENT_NICKNAME, &name) != ERROR_ok) {
-				printf("Error getting client nickname\n");
-				return;
-			}
-			break;
-		default:
-			printf("Invalid item type: %d\n", type);
-			data = NULL;  /* Ignore */
-			return;
-	}
-
-	*data = (char*)malloc(INFODATA_BUFSIZE * sizeof(char));  /* Must be allocated in the plugin! */
-	snprintf(*data, INFODATA_BUFSIZE, "The nickname is [I]\"%s\"[/I]", name);  /* bbCode is supported. HTML is not supported */
-	ts3Functions.freeMemory(name);
-}
-
-/* Required to release the memory for parameter "data" allocated in ts3plugin_infoData and ts3plugin_initMenus */
-void ts3plugin_freeMemory(void* data) {
-	free(data);
 }
