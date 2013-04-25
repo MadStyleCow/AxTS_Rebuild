@@ -90,6 +90,7 @@ BOOL talking = FALSE;
 BOOL vadEnabled = FALSE;
 BOOL timerReset = FALSE;
 BOOL recalcRequired = FALSE;
+BOOL pipeOpen;
 
 /* 
  * ALL CUSTOM FUNCTIONS HAVE SPECIFIC PREFIXES INDICATING WHAT DO THEY DO *
@@ -139,6 +140,7 @@ void hlp_disableVad();
 int hlp_getChannel(anyID idClient, float clientArray[], float selfArray[]);
 void hlp_timerThread(void* pArguments);
 void hlp_setMetaData(string data);
+string hlp_generateMetaData();
 
 void prs_commandText(string &commandText, anyID &idClient);
 void prs_parseREQ(anyID &idClient);
@@ -227,8 +229,7 @@ int ts3plugin_init()
 				connected = TRUE;
 
 				// Set client metadata, publically declaring that we are using this plug-in.
-				string metaData = string(ts3plugin_name()) + " " + string(ts3plugin_version());
-				hlp_setMetaData(metaData);
+				hlp_setMetaData(hlp_generateMetaData());
 			}
 		}
 	}
@@ -431,8 +432,7 @@ void ts3plugin_onConnectStatusChangeEvent(uint64 serverConnectionHandlerID, int 
 			connected = TRUE;
 
 			// Set client metadata, publically declaring that we are using this plug-in.
-			string metaData = string(ts3plugin_name()) + " " + string(ts3plugin_version());
-			hlp_setMetaData(metaData);
+			hlp_setMetaData(hlp_generateMetaData());
 		}
 		else
 		{
@@ -648,6 +648,9 @@ void ipc_pipeConnect()
 		if(clientPipe != INVALID_HANDLE_VALUE)
 		{
 			printf("PLUGIN: Connected to a server pipe.\n");
+			// Update metadata to indicate that we are connected.
+			pipeOpen = TRUE;
+			hlp_setMetaData(hlp_generateMetaData());
 			// Set the read mode and the blocking mode of the named pipe.
 			DWORD dwMode = PIPE_READMODE_MESSAGE;
 			if (!SetNamedPipeHandleState(clientPipe, &dwMode, NULL, NULL))
@@ -659,6 +662,14 @@ void ipc_pipeConnect()
 		}
 		else
 		{
+			// Update metadata to indicate that we are disconnected
+			// Condition to prevent spamming updates of metadata.
+			if(pipeOpen != FALSE)
+			{
+				pipeOpen = FALSE;
+				hlp_setMetaData(hlp_generateMetaData());
+			}
+			// Wait before re-trying.
 			Sleep(500);
 		}
     }
@@ -1452,23 +1463,42 @@ void hlp_timerThread(void* pArguments)
 
 void hlp_setMetaData(string data)
 {
-	if(ts3Functions.setClientSelfVariableAsString(connectionHandlerID, CLIENT_META_DATA, data.c_str()) == ERROR_ok)
+	if(connected == TRUE)
 	{
-		printf("PLUGIN: Metadata set.\n");
-
-		if(ts3Functions.flushClientSelfUpdates(connectionHandlerID, NULL) == ERROR_ok)
+		if(ts3Functions.setClientSelfVariableAsString(connectionHandlerID, CLIENT_META_DATA, data.c_str()) == ERROR_ok)
 		{
-			printf("PLUGIN: Metadata flush success.\n");
+			printf("PLUGIN: Metadata set.\n");
+
+			if(ts3Functions.flushClientSelfUpdates(connectionHandlerID, NULL) == ERROR_ok)
+			{
+				printf("PLUGIN: Metadata flush success.\n");
+			}
+			else
+			{
+				printf("PLUGIN: Metadata flush failure.\n");
+			}
 		}
 		else
 		{
-			printf("PLUGIN: Metadata flush failure.\n");
+			printf("PLUGIN: Failed to set metadata.\n");
 		}
 	}
 	else
 	{
-		printf("PLUGIN: Failed to set metadata.\n");
+		printf("PLUGIN: Not connected to a server. Skipping metadata update.\n");
 	}
+}
+
+string hlp_generateMetaData()
+{
+	string pipeState;
+
+	if(pipeOpen == TRUE)
+		pipeState = "Yes";
+	else
+		pipeState = "No";
+
+	return string(ts3plugin_name()) + string(" ") + string(ts3plugin_version()) + string("\nARMA 2 connected: ") + pipeState; 
 }
 /********************************* Helper Functions END ***************************************/
 
