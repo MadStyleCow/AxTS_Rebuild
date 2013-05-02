@@ -1,5 +1,5 @@
 TEMPLATE = lib
-TARGET = a2ts_rebuild
+TARGET = a2ts_rebuild_win32
 
 HEADERS += \
     include/ts3plugin.h \

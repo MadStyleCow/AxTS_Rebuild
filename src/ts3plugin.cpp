@@ -157,7 +157,7 @@ const char* ts3plugin_name() {
 }
 
 const char* ts3plugin_version() {
-    return "v0.5";
+    return "v0.6.0";
 }
 
 int ts3plugin_apiVersion() {
@@ -199,7 +199,6 @@ int ts3plugin_init()
 {
 	/* Plugin init code goes here */
 	printf("PLUGIN: Init\n");
-
 	int errorCode = 0;
 
 	self = new argsComPOS();
@@ -452,7 +451,7 @@ void ts3plugin_onPluginCommandEvent(uint64 serverConnectionHandlerID, const char
 {
 	if(connected == TRUE && inRt == TRUE && serverConnectionHandlerID == connectionHandlerID)
 	{
-		if(strcmp(pluginName, "a2ts_rebuild") != 0)
+		if(strcmp(pluginName, "a2ts_rebuild_win32") != 0 || strcmp(pluginName, "a2ts_rebuild_win64") != 0)
 		{
 			printf("PLUGIN: Plugin command event failure.\n");
 		}
@@ -498,9 +497,14 @@ void ts3plugin_onClientMoveEvent(uint64 serverConnectionHandlerID, anyID clientI
 				{
 					printf("PLUGIN: Switched to RT channel.\n");
 					newcid = newChannelID;
+					oldcid = oldChannelID;
 					inRt = TRUE;
 				}
 				ts3Functions.freeMemory(result);
+			}
+			else
+			{
+				printf("PLUGIN: Channel name query failure..\n");
 			}
 		}
 		else
@@ -585,8 +589,10 @@ void ts3plugin_onCustom3dRolloffCalculationClientEvent(uint64 serverConnectionHa
 	}
 }
 
-void ts3plugin_onEditPostProcessVoiceDataEvent(uint64 serverConnectionHandlerID, anyID clientID, short* samples, int sampleCount, int channels, const unsigned int* channelSpeakerArray, unsigned int* channelFillMask)
+void ts3plugin_onEditPlaybackVoiceDataEvent(uint64 serverConnectionHandlerID, anyID clientID, short* samples, int sampleCount, int channels)
 {
+	// Any voice alterations are to be done here, as this runs before onCustom3dRolloffCalculationEvent (which sets the volume).
+
 	if(inRt == TRUE && players.contains(clientID) && serverConnectionHandlerID == connectionHandlerID)
 	{
 		if((players[clientID].TAN == 1 || players[clientID].TAN == 2) && (players[clientID].hearableKV != -1 || players[clientID].hearableDV != -1))
@@ -594,6 +600,70 @@ void ts3plugin_onEditPostProcessVoiceDataEvent(uint64 serverConnectionHandlerID,
 			RadioNoiseDSP(1.00f, samples, sampleCount);
 		}
 	}
+}
+
+void ts3plugin_onEditPostProcessVoiceDataEvent(uint64 serverConnectionHandlerID, anyID clientID, short* samples, int sampleCount, int channels, const unsigned int* channelSpeakerArray, unsigned int* channelFillMask)
+{
+	// Sound positioning (left\right ear\both) should be done here. As it runs after alterations to sound and volume were applied.
+
+	if(inRt == TRUE && players.contains(clientID) && serverConnectionHandlerID == connectionHandlerID && connected == TRUE)
+	{
+		int fillMask = SPEAKER_FRONT_LEFT + SPEAKER_FRONT_RIGHT;
+
+		if(players[clientID].hearableKV != -1 && players[clientID].TAN == 1)
+		{
+			// The player is speaking via SW and we can hear him.
+			int selfSWPosArray[] = {self->kvPos0, self->kvPos1, self->kvPos2, self->kvPos3};
+
+			switch(selfSWPosArray[players[clientID].hearableKV])
+			{
+			case 0:
+				fillMask = SPEAKER_FRONT_LEFT;
+				break;
+			case 2:
+				fillMask = SPEAKER_FRONT_RIGHT;
+				break;
+			}
+		}
+		else if (players[clientID].hearableDV != -1 && players[clientID].TAN == 2)
+		{
+			// The player is speaking via LW and we can hear him.
+			int selfLWPosArray[] = {self->dvPos0, self->dvPos1, self->dvPos2, self->dvPos3};
+
+			switch(selfLWPosArray[players[clientID].hearableDV])
+			{
+			case 0:
+				fillMask = SPEAKER_FRONT_LEFT;
+				break;
+			case 2:
+				fillMask = SPEAKER_FRONT_RIGHT;
+				break;
+			}
+		}
+		*channelFillMask = fillMask;
+	}
+}
+
+int  ts3plugin_onClientPokeEvent(uint64 serverConnectionHandlerID, anyID fromClientID, const char* pokerName, const char* pokerUniqueIdentity, const char* message, int ffIgnored)
+{
+	if(serverConnectionHandlerID == connectionHandlerID && inRt == TRUE && connected == TRUE)
+	{
+		if(message && message[0] != '\0')
+		{
+			string messageText = "Poke from " + string(pokerName) + ": " + string(message);
+			int errorCode = ts3Functions.requestSendChannelTextMsg(connectionHandlerID, messageText.c_str(), newcid, NULL);
+			if(errorCode != ERROR_ok)
+			{
+				printf("PLUGIN: Failed to post poke.\n");
+				return errorCode;
+			}
+			else
+			{
+				printf("PLUGIN: Poke post success.\n");
+			}
+		}
+	}
+	return ERROR_ok;
 }
 
 void ts3plugin_infoData(uint64 serverConnectionHandlerID, uint64 id, enum PluginItemType type, char** data)
@@ -869,7 +939,7 @@ void chnl_moveFromRt()
 		}
 
 		// Move the player from RT
-		errorCode = ts3Functions.requestClientMove(connectionHandlerID, myId, oldcid, "", 0);
+		errorCode = ts3Functions.requestClientMove(connectionHandlerID, myId, oldcid, "", NULL);
 		if(errorCode == ERROR_ok)
 		{
 			printf("PLUGIN: Moved user back to old channel.\n");
@@ -1122,8 +1192,6 @@ void pos_self()
 
 void vPos_infantry(anyID &idClient)
 {
-	printf("DEBUG: VPOS INFANTRY\n");
-
 	TS3_VECTOR clientPos;
 	QVector3D rel_pos = trans_matrix.map(QVector3D(players[idClient].posX, players[idClient].posY, players[idClient].posZ));
 	clientPos.x = rel_pos.x();
@@ -1147,11 +1215,8 @@ void vPos_infantry(anyID &idClient)
 	}
 }
 
-void vPos_vehicle(anyID &idClient) // Узнать почему прыгает позиция.
+void vPos_vehicle(anyID &idClient)
 {
-	printf("DEBUG: VPOS VEHICLE\n");
-
-
 	int errorCode = 0;
 	TS3_VECTOR othPos;
 
@@ -1202,9 +1267,8 @@ void rPos_clientSW(anyID &idClient, int &channelPos)
 {
 	int errorCode = 0;
 	TS3_VECTOR othPos;
-	int channelPosArray[] = {self->kvPos0, self->kvPos1, self->kvPos2, self->kvPos3};
 
-	othPos.x = (channelPosArray[channelPos] -1) * 20;
+	othPos.x = 0;
 	othPos.y = 0;
 	othPos.z = 0;
 
@@ -1223,9 +1287,8 @@ void rPos_clientLW(anyID &idClient, int &channelPos)
 {
 	int errorCode = 0;
 	TS3_VECTOR othPos;
-	int channelPosArray[] = {self->dvPos0, self->dvPos1, self->dvPos2, self->dvPos3};
 
-	othPos.x = channelPosArray[channelPos] - 1 * 20;
+	othPos.x = 0;
 	othPos.y = 0;
 	othPos.z = 0;
 
@@ -1257,7 +1320,7 @@ void hlp_muteClient(anyID &idClient)
 	int errorCode = ts3Functions.getClientVariableAsInt(connectionHandlerID, idClient, CLIENT_IS_MUTED, &clientMuted);
 	if(errorCode != ERROR_ok)
 	{
-		printf("DEBUG: MUTE FAILED FOR CLIENT %d\n", idClient);
+		printf("PLUGIN: Failed to read mute status for client %d\n", idClient);
 	}
 	if(clientMuted == 0)
 	{
@@ -1282,7 +1345,7 @@ void hlp_unmuteClient(anyID &idClient)
 	int errorCode = ts3Functions.getClientVariableAsInt(connectionHandlerID, idClient, CLIENT_IS_MUTED, &clientMuted);
 	if(errorCode != ERROR_ok)
 	{
-		printf("DEBUG: UNMUTE FAILED FOR CLIENT %d\n", idClient);
+		printf("PLUGIN: Failed to read mute status for client %d\n", idClient);
 	}
 	else
 	{
