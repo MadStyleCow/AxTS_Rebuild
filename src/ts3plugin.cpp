@@ -3,8 +3,6 @@
 #include <Windows.h>
 #endif
 
-#define _USE_MATH_DEFINES
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,7 +13,6 @@
 #include <string>
 #include <qhash.h>
 #include <sstream>
-#include <math.h>
 #include <qstring.h>
 #include <qstringlist.h>
 #include "include/public_errors.h"
@@ -157,7 +154,7 @@ const char* ts3plugin_name() {
 }
 
 const char* ts3plugin_version() {
-    return "v0.6.0";
+    return "v0.7.0.0d";
 }
 
 int ts3plugin_apiVersion() {
@@ -259,7 +256,7 @@ int ts3plugin_init()
 		}
 	}
 
-/*	//Initialize a named-pipe sender thread.
+	//Initialize a named-pipe sender thread.
 	if(senderThreadHndl == NULL)
 	{
 		printf("PLUGIN: Sender handle is unassigned. Assigning..\n");
@@ -277,7 +274,7 @@ int ts3plugin_init()
 			printf("PLUGIN: Couldn't start sender thread.\n");
 			return 1;
 		}
-	}*/
+	}
 
 	// Initialize an timer thread
 	if(timerThreadHndl == NULL)
@@ -451,7 +448,7 @@ void ts3plugin_onPluginCommandEvent(uint64 serverConnectionHandlerID, const char
 {
 	if(connected == TRUE && inRt == TRUE && serverConnectionHandlerID == connectionHandlerID)
 	{
-		if(strcmp(pluginName, "a2ts_rebuild_win32") != 0 || strcmp(pluginName, "a2ts_rebuild_win64") != 0)
+		if(strcmp(pluginName, "a2ts_rebuild_win32") != 0)
 		{
 			printf("PLUGIN: Plugin command event failure.\n");
 		}
@@ -538,7 +535,7 @@ void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int sta
 	}
 }
 
-void ts3plugin_onCustom3dRolloffCalculationClientEvent(uint64 serverConnectionHandlerID, anyID clientID, float distance , float* volume ) // AWAITING REWRITE
+void ts3plugin_onCustom3dRolloffCalculationClientEvent(uint64 serverConnectionHandlerID, anyID clientID, float distance , float* volume )
 {
 	if(inRt == TRUE && players.contains(clientID) && serverConnectionHandlerID == connectionHandlerID)
 	{
@@ -565,15 +562,15 @@ void ts3plugin_onCustom3dRolloffCalculationClientEvent(uint64 serverConnectionHa
 			{
 			case 0:
 				// Whisper
-				calculatedVolume = 1.0f - distance * 0.3f; // ~3,33 meters of hearing range.
+				calculatedVolume = 0.3f - distance * 0.075f; // ~3 meters of hearing range.
 				break;
 			case 1:
 				// Normal
-				calculatedVolume = 1.0f - distance * 0.1f; // ~ 10 meters of hearing range.
+				calculatedVolume = 0.5f - distance * 0.025f; // ~ 20 meters of hearing range.
 				break;
 			case 2:
 				// Screaming
-				calculatedVolume = 1.0f - distance * 0.01f; // ~ 100 meters of hearing range.
+				calculatedVolume = 0.8f - distance * 0.01f; // ~ 80 meters of hearing range.
 				break;
 			}
 
@@ -618,10 +615,10 @@ void ts3plugin_onEditPostProcessVoiceDataEvent(uint64 serverConnectionHandlerID,
 			switch(selfSWPosArray[players[clientID].hearableKV])
 			{
 			case 0:
-				fillMask = SPEAKER_FRONT_LEFT;
+				fillMask = SPEAKER_FRONT_RIGHT;
 				break;
 			case 2:
-				fillMask = SPEAKER_FRONT_RIGHT;
+				fillMask = SPEAKER_FRONT_LEFT;
 				break;
 			}
 		}
@@ -633,10 +630,10 @@ void ts3plugin_onEditPostProcessVoiceDataEvent(uint64 serverConnectionHandlerID,
 			switch(selfLWPosArray[players[clientID].hearableDV])
 			{
 			case 0:
-				fillMask = SPEAKER_FRONT_LEFT;
+				fillMask = SPEAKER_FRONT_RIGHT;
 				break;
 			case 2:
-				fillMask = SPEAKER_FRONT_RIGHT;
+				fillMask = SPEAKER_FRONT_LEFT;
 				break;
 			}
 		}
@@ -670,7 +667,8 @@ void ts3plugin_infoData(uint64 serverConnectionHandlerID, uint64 id, enum Plugin
 {
 	if(connected == TRUE && serverConnectionHandlerID == connectionHandlerID)
 	{
-		char* metaData = "No plug-in detected.";
+
+		char* metaData;
 
 		switch(type) 
 		{
@@ -686,13 +684,17 @@ void ts3plugin_infoData(uint64 serverConnectionHandlerID, uint64 id, enum Plugin
 				return;
 		}
 		
-		if(*metaData == '\0')
-		{
-			metaData = "No plug-in detected.";
-		}
-
 		*data = (char*)malloc(INFODATA_BUFSIZE * sizeof(char));
-		snprintf(*data, INFODATA_BUFSIZE, "[I]\%s\[/I]", metaData);
+
+		if(*metaData == '\0')
+
+			snprintf(*data, INFODATA_BUFSIZE, "[I]\%s\[/I]", "No plug-in detected.");
+
+		else
+			snprintf(*data, INFODATA_BUFSIZE, "[I]\%s\[/I]", metaData);
+
+
+
 		ts3Functions.freeMemory(metaData);
 	}
 }
@@ -722,7 +724,7 @@ void ipc_pipeConnect()
 			pipeOpen = TRUE;
 			hlp_setMetaData(hlp_generateMetaData());
 			// Set the read mode and the blocking mode of the named pipe.
-			DWORD dwMode = PIPE_READMODE_MESSAGE;
+			DWORD dwMode = PIPE_READMODE_MESSAGE | PIPE_NOWAIT;
 			if (!SetNamedPipeHandleState(clientPipe, &dwMode, NULL, NULL))
 			{
 				dwError = GetLastError();
@@ -786,6 +788,11 @@ void ipc_receiveCommand(void* pArguments)
 					{
 						printf("PLUGIN: IO Operation aborted.\n");
 					}
+					else if(errCode == 232)
+					{
+						// No data to read.
+						Sleep(100);
+					}
 					else
 					{
 						printf("PLUGIN: Read failed. Error code: %d\n",GetLastError());
@@ -816,23 +823,28 @@ void ipc_sendCommand(void* pArguments)
 	while(stopRequested != TRUE)
 	{
 		if(inRt == TRUE && !outgoingMessages.empty())
-		{
-			const char* chRequest = outgoingMessages.front().c_str();
-			outgoingMessages.pop();
-			DWORD cbWritten;
 
-			printf("chRequest is %s\n", chRequest);
+		{	
+			DWORD cbRequest, cbWritten;
+			cbRequest = outgoingMessages.front().size() + 1;
 
 			if (!WriteFile(
-				clientPipe,											// Handle of the pipe
-				chRequest,											// Message to be written
-				sizeof(chRequest),									// Number of bytes to write
-				&cbWritten,											// Number of bytes written
-				NULL												// Not overlapped
+				clientPipe,							// Handle of the pipe
+				outgoingMessages.front().c_str(),   // Message to be written
+				cbRequest,							// Number of bytes to write
+				&cbWritten,							// Number of bytes written
+				NULL								// Not overlapped
 				))
 			{
 				dwError = GetLastError();
-				printf("PLUGIN: WriteFile to pipe failed w/err 0x%08lx\n", dwError);
+				wprintf(L"Write to pipe failed w/err 0x%08lx\n", dwError);
+				// Clear queue in case of problems.
+				while(!outgoingMessages.empty())
+					outgoingMessages.pop();
+			}
+			else
+			{
+				outgoingMessages.pop();
 			}
 		}
 		else
@@ -1270,7 +1282,7 @@ void rPos_clientSW(anyID &idClient, int &channelPos)
 
 	othPos.x = 0;
 	othPos.y = 0;
-	othPos.z = 0;
+	othPos.z = 1;
 
 	errorCode = ts3Functions.channelset3DAttributes(connectionHandlerID, idClient, &othPos);
 	if(errorCode != ERROR_ok)
@@ -1290,7 +1302,7 @@ void rPos_clientLW(anyID &idClient, int &channelPos)
 
 	othPos.x = 0;
 	othPos.y = 0;
-	othPos.z = 0;
+	othPos.z = 1;
 
 	errorCode = ts3Functions.channelset3DAttributes(connectionHandlerID, idClient, &othPos);
 	if(errorCode != ERROR_ok)

@@ -273,7 +273,7 @@
   <ImportGroup Label="ExtensionTargets" />
   <ProjectExtensions>
     <VisualStudio>
-      <UserProperties QtVersion_x0020_Win32="4.8.4x32" UicDir=".\GeneratedFiles" RccDir=".\GeneratedFiles" QtVersion_x0020_x64="4.8.4x64" />
+      <UserProperties QtVersion_x0020_Win32="4.8.5" UicDir=".\GeneratedFiles" RccDir=".\GeneratedFiles" QtVersion_x0020_x64="4.8.4x64" />
     </VisualStudio>
   </ProjectExtensions>
 </Project>
