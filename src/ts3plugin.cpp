@@ -58,6 +58,7 @@ static char* pluginID = NULL;
 uint64 connectionHandlerID = 0;
 anyID myId = 0;
 char* chname[] = {"PvP_WOG","RT",""};
+char* logchannel[] = {"KGB",""};
 
 // System variables
 DWORD dwError = ERROR_SUCCESS;
@@ -83,7 +84,6 @@ QMatrix4x4 trans_matrix;
 BOOL inRt = 0;
 BOOL stopRequested = FALSE;
 BOOL connected = 0;
-BOOL talking = FALSE;
 BOOL vadEnabled = FALSE;
 BOOL timerReset = FALSE;
 BOOL recalcRequired = FALSE;
@@ -159,7 +159,7 @@ const char* ts3plugin_name() {
 }
 
 const char* ts3plugin_version() {
-    return "v0.7.1.0d";
+    return "v0.7.2.0d";
 }
 
 int ts3plugin_apiVersion() {
@@ -557,7 +557,7 @@ void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int sta
 					{
 						// Yes he is using SW radio.
 						// Can we hear him at all?
-						if(players[clientID].hearableKV != -1 && talking == FALSE)
+						if(players[clientID].hearableKV != -1 && self->talking == FALSE)
 						{
 							// Yes we can. Play a SW start beep.
 							// Indicate player as talking via SW.
@@ -569,7 +569,7 @@ void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int sta
 					{
 						// Yes he is using LW radio.
 						// Can we hear him at all?
-						if(players[clientID].hearableDV != -1 && talking == FALSE)
+						if(players[clientID].hearableDV != -1 && self->talking == FALSE)
 						{
 							// Yes we can. Play a LW start beep.
 							// Indicate player as talking via SW.
@@ -586,7 +586,7 @@ void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int sta
 					{
 						// He was talking via SW radio.
 						// Can we hear him at all?
-						if(players[clientID].hearableKV != -1 && talking == FALSE)
+						if(players[clientID].hearableKV != -1 && self->talking == FALSE)
 						{
 							// Yes we can. Play the SW beep-out.
 							errorCode = ts3Functions.playWaveFile(connectionHandlerID, beeopout_sw);
@@ -595,7 +595,7 @@ void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int sta
 					else if (players[clientID].isTalker == 2)
 					{
 						// He was talking via LW radio.
-						if(players[clientID].hearableDV != -1 && talking == FALSE)
+						if(players[clientID].hearableDV != -1 && self->talking == FALSE)
 						{
 							// Yes we can. Play the LW beep-out.
 							errorCode = ts3Functions.playWaveFile(connectionHandlerID, beepout_lw); 
@@ -625,7 +625,7 @@ void ts3plugin_onCustom3dRolloffCalculationClientEvent(uint64 serverConnectionHa
 	{
 		if(players[clientID].TAN == 1 && players[clientID].hearableKV != -1)
 		{
-			if(talking == FALSE)
+			if(self->talking == FALSE)
 			{
 				// Shortwave
 				float swVolArray[] = {self->kvVol0, self->kvVol1, self->kvVol2, self->kvVol3};
@@ -639,7 +639,7 @@ void ts3plugin_onCustom3dRolloffCalculationClientEvent(uint64 serverConnectionHa
 		}
 		else if(players[clientID].TAN == 2 && players[clientID].hearableDV != -1)
 		{
-			if(talking == FALSE)
+			if(self->talking == FALSE)
 			{
 				// Longwave
 				float lwVolArray[] = {self->dvVol0, self->dvVol1, self->dvVol2, self->dvVol3};
@@ -690,7 +690,8 @@ void ts3plugin_onEditPlaybackVoiceDataEvent(uint64 serverConnectionHandlerID, an
 
 	if(inRt == TRUE && players.contains(clientID) && serverConnectionHandlerID == connectionHandlerID)
 	{
-		if((players[clientID].TAN == 1 || players[clientID].TAN == 2) && (players[clientID].hearableKV != -1 || players[clientID].hearableDV != -1))
+
+		if((players[clientID].TAN == 1 && players[clientID].hearableKV != -1) || (players[clientID].TAN == 2 &&players[clientID].hearableDV != -1))
 		{
 			// Radio
 			RadioNoiseDSP(1.00f, samples, sampleCount);
@@ -751,15 +752,25 @@ int  ts3plugin_onClientPokeEvent(uint64 serverConnectionHandlerID, anyID fromCli
 		if(message && message[0] != '\0')
 		{
 			string messageText = "Poke from " + string(pokerName) + ": " + string(message);
-			int errorCode = ts3Functions.requestSendChannelTextMsg(connectionHandlerID, messageText.c_str(), newcid, NULL);
+			uint64 channelid;
+			int errorCode = ts3Functions.getChannelIDFromChannelNames(connectionHandlerID, logchannel, &channelid);
 			if(errorCode != ERROR_ok)
 			{
-				printf("PLUGIN: Failed to post poke.\n");
+				printf("PLUGIN: Failed to find log channel.\n");
 				return errorCode;
 			}
 			else
 			{
-				printf("PLUGIN: Poke post success.\n");
+				errorCode = ts3Functions.requestSendChannelTextMsg(connectionHandlerID, messageText.c_str(), channelid, NULL);
+				if(errorCode != ERROR_ok)
+				{
+					printf("PLUGIN: Failed to post poke.\n");
+					return errorCode;
+				}
+				else
+				{
+					printf("PLUGIN: Poke post success.\n");
+				}
 			}
 		}
 	}
@@ -768,15 +779,14 @@ int  ts3plugin_onClientPokeEvent(uint64 serverConnectionHandlerID, anyID fromCli
 
 void ts3plugin_infoData(uint64 serverConnectionHandlerID, uint64 id, enum PluginItemType type, char** data)
 {
-	if(connected == TRUE && serverConnectionHandlerID == connectionHandlerID)
+	if(connected == TRUE)
 	{
-
 		char* metaData;
 
 		switch(type) 
 		{
 			case PLUGIN_CLIENT:
-				if(ts3Functions.getClientVariableAsString(connectionHandlerID, (anyID)id, CLIENT_META_DATA, &metaData) != ERROR_ok)
+				if(ts3Functions.getClientVariableAsString(serverConnectionHandlerID, (anyID)id, CLIENT_META_DATA, &metaData) != ERROR_ok)
 				{
 					printf("PLUGIN: Failure querying metadata.\n");
 					return;
@@ -795,8 +805,6 @@ void ts3plugin_infoData(uint64 serverConnectionHandlerID, uint64 id, enum Plugin
 
 		else
 			snprintf(*data, INFODATA_BUFSIZE, "[I]\%s\[/I]", metaData);
-
-
 
 		ts3Functions.freeMemory(metaData);
 	}
@@ -1643,7 +1651,7 @@ void hlp_timerThread(void* pArguments)
 			timerReset = FALSE;
 		}
 
-		if(ticks > 5 && inRt == TRUE)
+		if(ticks > 3 && inRt == TRUE)
 		{
 			chnl_moveFromRt();
 			timerReset = TRUE;
@@ -1796,9 +1804,9 @@ void prs_parsePOS()
 	pos_self();
 
 	// Check if microphone needs to be enabled or disabled.
-	if(self->TAN != 0 && talking == FALSE)
+	if(self->TAN != 0 && self->talking == FALSE)
 	{
-		talking = TRUE;
+		self->talking = TRUE;
 
 		// Disable VAD so as not to interfere with microphone functioning.
 		vadEnabled = hlp_checkVad();
@@ -1808,9 +1816,9 @@ void prs_parsePOS()
 		// Enable microphone.
 		hlp_enableMic();
 	}
-	else if(self->TAN == 0 && talking == TRUE)
+	else if(self->TAN == 0 && self->talking == TRUE)
 	{
-		talking = FALSE;
+		self->talking = FALSE;
 
 		// Enable VAD if it was disabled.
 		if(vadEnabled == TRUE)
@@ -1854,17 +1862,17 @@ void prs_parseOTH(anyID &idClient)
 	{
 		// Create a new record
 		players.insert(idClient, *other);
-		
-		// Calculate if we can hear him.
-		float playerSWArray[] = {players[idClient].kvChan0, players[idClient].kvChan1, players[idClient].kvChan2, players[idClient].kvChan3};
-		float playerLWArray[] = {players[idClient].dvChan0, players[idClient].dvChan1, players[idClient].dvChan2, players[idClient].dvChan3};
-
-		float selfSWArray[] = {self->kvChan0, self->kvChan1, self->kvChan2, self->kvChan3};
-		float selfLWArray[] = {self->dvChan0, self->dvChan1, self->dvChan2, self->dvChan3};
-
-		players[idClient].hearableKV = hlp_getChannel(idClient, playerSWArray, selfSWArray, TRUE);
-		players[idClient].hearableDV = hlp_getChannel(idClient, playerLWArray, selfLWArray, FALSE);
 	}
+	// Calculate if we can hear him.
+	float playerSWArray[] = {players[idClient].kvChan0, players[idClient].kvChan1, players[idClient].kvChan2, players[idClient].kvChan3};
+	float playerLWArray[] = {players[idClient].dvChan0, players[idClient].dvChan1, players[idClient].dvChan2, players[idClient].dvChan3};
+
+	float selfSWArray[] = {self->kvChan0, self->kvChan1, self->kvChan2, self->kvChan3};
+	float selfLWArray[] = {self->dvChan0, self->dvChan1, self->dvChan2, self->dvChan3};
+
+	players[idClient].hearableKV = hlp_getChannel(idClient, playerSWArray, selfSWArray, TRUE);
+	players[idClient].hearableDV = hlp_getChannel(idClient, playerLWArray, selfLWArray, FALSE);
+
 	pos_client(idClient);
 }
 
