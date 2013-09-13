@@ -119,7 +119,7 @@ void chnl_moveToRt();
 void chnl_moveFromRt();
 
 void msg_generateOTH(string &result);
-void msg_generateREQ(string &result);
+void msg_generateREQ(string &result, anyID &targetId);
 void msg_generateMIN(string &result);
 
 void pos_client(anyID idClient);
@@ -145,8 +145,8 @@ void hlp_timerThread(void* pArguments);
 void hlp_setMetaData(string data);
 string hlp_generateMetaData();
 
-void prs_commandText(string &commandText, anyID &idClient);
-void prs_parseREQ(anyID &idClient);
+void prs_commandText(string &commandText, anyID &idClient, anyID &targetId);
+void prs_parseREQ(anyID &idClient, anyID &targetId);
 void prs_parseMIN(anyID &idClient);
 void prs_parseOTH(anyID &idClient);
 void prs_parsePOS();
@@ -160,7 +160,7 @@ const char* ts3plugin_name() {
 }
 
 const char* ts3plugin_version() {
-    return "v0.7.5";
+    return "v0.7.5.2d";
 }
 
 int ts3plugin_apiVersion() {
@@ -461,7 +461,7 @@ void ts3plugin_onPluginCommandEvent(uint64 serverConnectionHandlerID, const char
 		else
 		{
 			string commandText(pluginCommand);
-			string tokenizedCommandText[2];
+			string tokenizedCommandText[3];
 			size_t current;
 			size_t next = -1;
 			int iterator = 0;
@@ -476,10 +476,11 @@ void ts3plugin_onPluginCommandEvent(uint64 serverConnectionHandlerID, const char
 			while (next != string::npos);
 
 			anyID idClient = (unsigned short) strtoul(tokenizedCommandText[0].c_str(), NULL, 0);
+			anyID targetId = (unsigned short) strtoul(tokenizedCommandText[1].c_str(), NULL, 0);
 
 			if(myId != idClient)
 			{
-				prs_commandText(tokenizedCommandText[1], idClient);
+				prs_commandText(tokenizedCommandText[2], idClient, targetId);
 			}
 		}
 	}
@@ -1052,9 +1053,10 @@ void ipc_handlingReceivedCommands(void* pArguments)
 			// Get a command from the queue.
 			string commandText = incomingMessages.front();
 			incomingMessages.pop();
+			anyID targetId = (anyID)0;
 
 			// Pass it on for parsing.
-			prs_commandText(commandText, myId);
+			prs_commandText(commandText, myId, targetId);
 		}
 		else
 		{
@@ -1193,7 +1195,7 @@ void chnl_moveFromRt()
 void msg_generateOTH(string &result)
 {
 	stringstream othStream;
-	othStream << myId << "@[A2TS_CMD]OTH[/A2TS_CMD][A2TS_ARG]" 
+	othStream << myId << "@0@[A2TS_CMD]OTH[/A2TS_CMD][A2TS_ARG]" 
 		<< self->posX									<< ";" 
 		<< self->posY									<< ";" 
 		<< self->posZ									<< ";" 
@@ -1218,10 +1220,10 @@ void msg_generateOTH(string &result)
 	result = othStream.str();
 }
 
-void msg_generateREQ(string &result)
+void msg_generateREQ(string &result, anyID &targetId)
 {
 	stringstream reqStream;
-	reqStream << myId << "@[A2TS_CMD]REQ[/A2TS_CMD]";
+	reqStream << myId << "@" << targetId << "@[A2TS_CMD]REQ[/A2TS_CMD]";
 	printf("GENERATION: Generated REQ message.\n");
 	result = reqStream.str();
 }
@@ -1229,7 +1231,7 @@ void msg_generateREQ(string &result)
 void msg_generateMIN(string &result)
 {
 	stringstream minStream;
-	minStream << myId << "@[A2TS_CMD]MIN[/A2TS_CMD][A2TS_ARG]"
+	minStream << myId << "@0@[A2TS_CMD]MIN[/A2TS_CMD][A2TS_ARG]"
 		<< self->posX		<< ";"
 		<< self->posY		<< ";"
 		<< self->posZ		<< ";"
@@ -1795,7 +1797,7 @@ string hlp_generateMetaData()
 /********************************* Helper Functions END ***************************************/
 
 /********************************* Command Parsing & Processing Functions START ****************************/
-void prs_commandText(string &commandText, anyID &idClient)
+void prs_commandText(string &commandText, anyID &idClient, anyID &targetId)
 {
 	int parseCode = commandCheck(commandText, *self, *other, *miniOther);
 
@@ -1830,7 +1832,7 @@ void prs_commandText(string &commandText, anyID &idClient)
 		break;
 	case 13:
 		printf("PARSER: REQ command parsed.\n");
-		prs_parseREQ(idClient);	
+		prs_parseREQ(idClient, targetId);	
 		break;
 	}
 }
@@ -1851,8 +1853,9 @@ void prs_parsePOS()
 		// Inform everyone of our position and request they do the same.
 		msg_generateOTH(generatedMessage);
 		hlp_sendPluginCommand(generatedMessage, myId, TRUE);
-
-		msg_generateREQ(generatedMessage);
+				
+		anyID targetId = (anyID)0;
+		msg_generateREQ(generatedMessage, targetId);
 		hlp_sendPluginCommand(generatedMessage, myId, TRUE);
 	}
 	else
@@ -1983,17 +1986,20 @@ void prs_parseMIN(anyID &idClient)
 	{
 		// We don't have full info on this person, and thus have to request it from him.
 		string reqMessage;
-		msg_generateREQ(reqMessage);
-		hlp_sendPluginCommand(reqMessage, idClient, FALSE);
+		msg_generateREQ(reqMessage, idClient);
+		hlp_sendPluginCommand(reqMessage, idClient, TRUE);
 	}
 }
 
-void prs_parseREQ(anyID &idClient)
+void prs_parseREQ(anyID &idClient, anyID &targetId)
 {
-	// Generate an OTH message and reply to the sender of REQ message.
-	string othMessage;
-	msg_generateOTH(othMessage);
-	hlp_sendPluginCommand(othMessage, idClient, FALSE);
+	if(targetId == myId || targetId == 0)
+	{
+		// Generate an OTH message and reply to the sender of REQ message.
+		string othMessage;
+		msg_generateOTH(othMessage);
+		hlp_sendPluginCommand(othMessage, idClient, TRUE);
+	}
 }
 
 /**********************89*********** Command Parsing & Processing Functions END ******************************/
