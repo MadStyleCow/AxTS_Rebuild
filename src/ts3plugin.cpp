@@ -15,6 +15,7 @@
 #include <sstream>
 #include <qstring.h>
 #include <qstringlist.h>
+#include <iostream>
 #include "include/public_errors.h"
 #include "include/public_errors_rare.h"
 #include "include/public_definitions.h"
@@ -41,7 +42,7 @@ static struct TS3Functions ts3Functions;
 
 #define PATH_BUFSIZE		512
 #define COMMAND_BUFSIZE		128
-#define INFODATA_BUFSIZE	128
+#define INFODATA_BUFSIZE	512
 #define SERVERINFO_BUFSIZE	256
 #define CHANNELINFO_BUFSIZE	512
 #define RETURNCODE_BUFSIZE	128
@@ -49,7 +50,7 @@ static struct TS3Functions ts3Functions;
 #define PIPE_NAME			L"a2ts"
 #define FULL_PIPE_NAME		L"\\\\" SERVER_NAME L"\\pipe\\" PIPE_NAME
 #define BUFFER_SIZE			512
-#define MAX_VOICE_RANGE		100
+#define MAX_VOICE_RANGE		80
 #define MAX_LW_RANGE		5000
 #define MAX_SW_RANGE		1000
 
@@ -90,9 +91,9 @@ BOOL recalcRequired = FALSE;
 BOOL pipeOpen;
 
 // Sound resources
-static char* beepin_lw = "plugins\\A2TS_Rebuild\\sounds\\beep_in_long.wav";
-static char* beepout_lw = "plugins\\A2TS_Rebuild\\sounds\\rbt_long.wav";
-static char* beeopout_sw = "plugins\\A2TS_Rebuild\\sounds\\rbt_short.wav";
+static char* beepin_lw = "plugins\\A2TS_Rebuild\\sounds\\beep_in_long_stereo.wav";
+static char* beepout_lw = "plugins\\A2TS_Rebuild\\sounds\\rbt_long_stereo.wav";
+static char* beepout_sw = "plugins\\A2TS_Rebuild\\sounds\\rbt_short_stereo.wav";
 
 /* 
  * ALL CUSTOM FUNCTIONS HAVE SPECIFIC PREFIXES INDICATING WHAT DO THEY DO *
@@ -134,7 +135,7 @@ void rPos_clientLW(anyID &idClient);
 double hlp_getDistance(float x1, float y1, float z1, float x2, float y2, float z2);
 void hlp_muteClient(anyID &idClient);
 void hlp_unmuteClient(anyID &idClient);
-void hlp_sendPluginCommand(string &commandText, anyID &idClient, BOOL isBroadcast);
+void hlp_sendPluginCommand(string &commandText, anyID idClient, BOOL isBroadcast);
 BOOL hlp_majorSelfDataChange();
 BOOL hlp_checkVad();
 void hlp_enableVad();
@@ -155,11 +156,11 @@ void RadioNoiseDSP(float slevel, short * samples, int sampleCount);
 /*********************************** Required functions START ************************************/
 
 const char* ts3plugin_name() {
-	return "A2TS Rebuild x32";
+	return "A2TS Rebuild";
 }
 
 const char* ts3plugin_version() {
-    return "v0.7.2.0d";
+    return "v0.7.5";
 }
 
 int ts3plugin_apiVersion() {
@@ -459,23 +460,26 @@ void ts3plugin_onPluginCommandEvent(uint64 serverConnectionHandlerID, const char
 		}
 		else
 		{
-			QString commandText(pluginCommand);
-			QStringList separatedCommandText = commandText.split("@");
+			string commandText(pluginCommand);
+			string tokenizedCommandText[2];
+			size_t current;
+			size_t next = -1;
+			int iterator = 0;
 
-			if(separatedCommandText.length() != 2)
+			do
 			{
-				printf("PLUGIN: Invalid command.\n");
-				return;
+			  current = next + 1;
+			  next = commandText.find_first_of("@", current );
+			  tokenizedCommandText[iterator] = commandText.substr( current, next - current );
+			  iterator++;
 			}
-			else
+			while (next != string::npos);
+
+			anyID idClient = (unsigned short) strtoul(tokenizedCommandText[0].c_str(), NULL, 0);
+
+			if(myId != idClient)
 			{
-				anyID idClient = (anyID)separatedCommandText[0].toInt();
-				// We want to ignore commands coming from ourselves.
-				if(myId != idClient)
-				{
-					string parseCommandText(separatedCommandText[1].toLocal8Bit().constData());
-					prs_commandText(parseCommandText, idClient);
-				}
+				prs_commandText(tokenizedCommandText[1], idClient);
 			}
 		}
 	}
@@ -530,7 +534,7 @@ void ts3plugin_onClientMoveEvent(uint64 serverConnectionHandlerID, anyID clientI
 	}
 }
 
-void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int status, int isReceivedWhisper, anyID clientID) // Improve
+void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int status, int isReceivedWhisper, anyID clientID)
 {
 	if(inRt == TRUE && connected == TRUE && serverConnectionHandlerID == connectionHandlerID)
 	{
@@ -543,6 +547,13 @@ void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int sta
 		}
 		else
 		{
+			uint64 waveHandle;
+			TS3_VECTOR wavePos;
+
+			wavePos.x = clientID;
+			wavePos.y = 0.0f;
+			wavePos.z = 0.0f; // Dirty hack to force wave rolloff calculations and give info regarding client.
+
 			// Somebody else started or stopped talking.
 			if(players.contains(clientID))
 			{
@@ -562,7 +573,20 @@ void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int sta
 							// Yes we can. Play a SW start beep.
 							// Indicate player as talking via SW.
 							players[clientID].isTalker = 1;
-							errorCode = ts3Functions.playWaveFile(connectionHandlerID, beepin_lw);
+							errorCode = ts3Functions.playWaveFileHandle(connectionHandlerID, beepin_lw, 0, &waveHandle);
+
+							if(errorCode != ERROR_ok)
+							{
+								printf("PLUGIN: Error playing sound file. Error code %d\n", errorCode);
+							}
+							else
+							{
+								errorCode = ts3Functions.set3DWaveAttributes(connectionHandlerID, waveHandle, &wavePos);
+								if(errorCode != ERROR_ok)
+								{
+									printf("PLUGIN: Failed to set wave 3D position. Error code %d\n", errorCode);
+								}
+							}
 						}
 					}
 					else if(players[clientID].TAN == 2)
@@ -573,8 +597,21 @@ void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int sta
 						{
 							// Yes we can. Play a LW start beep.
 							// Indicate player as talking via SW.
-							players[clientID].isTalker = 2;
-							errorCode = ts3Functions.playWaveFile(connectionHandlerID, beepin_lw);
+							players[clientID].isTalker = 2;						
+							errorCode = ts3Functions.playWaveFileHandle(connectionHandlerID, beepin_lw, 0, &waveHandle);
+
+							if(errorCode != ERROR_ok)
+							{
+								printf("PLUGIN: Error playing sound file. Error code %d\n", errorCode);
+							}
+							else
+							{
+								errorCode = ts3Functions.set3DWaveAttributes(connectionHandlerID, waveHandle, &wavePos);
+								if(errorCode != ERROR_ok)
+								{
+									printf("PLUGIN: Failed to set wave 3D position. Error code %d\n", errorCode);
+								}
+							}
 						}
 					}
 				}
@@ -589,7 +626,20 @@ void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int sta
 						if(players[clientID].hearableKV != -1 && self->talking == FALSE)
 						{
 							// Yes we can. Play the SW beep-out.
-							errorCode = ts3Functions.playWaveFile(connectionHandlerID, beeopout_sw);
+							errorCode = ts3Functions.playWaveFileHandle(connectionHandlerID, beepout_sw, 0, &waveHandle);								
+
+							if(errorCode != ERROR_ok)
+							{
+								printf("PLUGIN: Error playing sound file. Error code %d\n", errorCode);
+							}
+							else
+							{
+								errorCode = ts3Functions.set3DWaveAttributes(connectionHandlerID, waveHandle, &wavePos);
+								if(errorCode != ERROR_ok)
+								{
+									printf("PLUGIN: Failed to set wave 3D position. Error code %d\n", errorCode);
+								}
+							}
 						}
 					}
 					else if (players[clientID].isTalker == 2)
@@ -598,7 +648,20 @@ void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int sta
 						if(players[clientID].hearableDV != -1 && self->talking == FALSE)
 						{
 							// Yes we can. Play the LW beep-out.
-							errorCode = ts3Functions.playWaveFile(connectionHandlerID, beepout_lw); 
+							errorCode = ts3Functions.playWaveFileHandle(connectionHandlerID, beepout_lw, 0, &waveHandle);
+
+							if(errorCode != ERROR_ok)
+							{
+								printf("PLUGIN: Error playing sound file. Error code %d\n", errorCode);
+							}
+							else
+							{
+								errorCode = ts3Functions.set3DWaveAttributes(connectionHandlerID, waveHandle, &wavePos);
+								if(errorCode != ERROR_ok)
+								{
+									printf("PLUGIN: Failed to set wave 3D position. Error code %d\n", errorCode);
+								}
+							}
 						}
 					}
 
@@ -619,6 +682,35 @@ void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int sta
 	}
 }
 
+void ts3plugin_onCustom3dRolloffCalculationWaveEvent(uint64 serverConnectionHandlerID, uint64 waveHandle, float distance, float* volume)
+{
+	if(serverConnectionHandlerID == connectionHandlerID && connected == TRUE && inRt == TRUE)
+	{
+		if(players.contains((anyID)distance))
+		{
+			// Control volume here
+			float swVolArray[] = {self->kvVol0, self->kvVol1, self->kvVol2, self->kvVol3};
+			float lwVolArray[] = {self->dvVol0, self->dvVol1, self->dvVol2, self->dvVol3};
+			float calculatedVolume;
+
+			switch(players[(anyID)distance].isTalker)
+			{
+			case 1:
+				calculatedVolume = swVolArray[players[(anyID)distance].hearableKV] / 100;
+				break;
+			case 2:
+				calculatedVolume = lwVolArray[players[(anyID)distance].hearableDV] / 100;
+				break;
+			}
+
+			if(calculatedVolume < 0)
+				*volume = 0.0f;
+			else
+				*volume = calculatedVolume;
+		}
+	}
+}
+
 void ts3plugin_onCustom3dRolloffCalculationClientEvent(uint64 serverConnectionHandlerID, anyID clientID, float distance , float* volume )
 {
 	if(inRt == TRUE && players.contains(clientID) && serverConnectionHandlerID == connectionHandlerID)
@@ -629,7 +721,6 @@ void ts3plugin_onCustom3dRolloffCalculationClientEvent(uint64 serverConnectionHa
 			{
 				// Shortwave
 				float swVolArray[] = {self->kvVol0, self->kvVol1, self->kvVol2, self->kvVol3};
-
 				*volume = swVolArray[players[clientID].hearableKV] / 100;
 			}
 			else
@@ -643,7 +734,6 @@ void ts3plugin_onCustom3dRolloffCalculationClientEvent(uint64 serverConnectionHa
 			{
 				// Longwave
 				float lwVolArray[] = {self->dvVol0, self->dvVol1, self->dvVol2, self->dvVol3};
-
 				*volume = lwVolArray[players[clientID].hearableDV] / 100;
 			}
 			else
@@ -690,11 +780,18 @@ void ts3plugin_onEditPlaybackVoiceDataEvent(uint64 serverConnectionHandlerID, an
 
 	if(inRt == TRUE && players.contains(clientID) && serverConnectionHandlerID == connectionHandlerID)
 	{
-
-		if((players[clientID].TAN == 1 && players[clientID].hearableKV != -1) || (players[clientID].TAN == 2 &&players[clientID].hearableDV != -1))
+		float sLevel;
+		if(players[clientID].TAN == 1 && players[clientID].hearableKV != -1 && players[clientID].isTalker == 1)
 		{
-			// Radio
-			RadioNoiseDSP(1.00f, samples, sampleCount);
+			// Radio SW
+			sLevel = 1 + hlp_getDistance(self->posX, self->posY, self->posZ, players[clientID].posX, players[clientID].posY, players[clientID].posZ) / MAX_SW_RANGE;
+			RadioNoiseDSP(sLevel, samples, sampleCount);	
+		}
+		else if(players[clientID].TAN == 2 && players[clientID].hearableDV != -1 && players[clientID].isTalker == 2)
+		{
+			// Radio LW
+			sLevel = 1 + hlp_getDistance(self->posX, self->posY, self->posZ, players[clientID].posX, players[clientID].posY, players[clientID].posZ) / MAX_LW_RANGE;
+			RadioNoiseDSP(sLevel, samples, sampleCount);
 		}
 		else
 		{
@@ -747,33 +844,11 @@ void ts3plugin_onEditPostProcessVoiceDataEvent(uint64 serverConnectionHandlerID,
 
 int  ts3plugin_onClientPokeEvent(uint64 serverConnectionHandlerID, anyID fromClientID, const char* pokerName, const char* pokerUniqueIdentity, const char* message, int ffIgnored)
 {
-	if(serverConnectionHandlerID == connectionHandlerID && inRt == TRUE && connected == TRUE)
-	{
-		if(message && message[0] != '\0')
-		{
-			string messageText = "Poke from " + string(pokerName) + ": " + string(message);
-			uint64 channelid;
-			int errorCode = ts3Functions.getChannelIDFromChannelNames(connectionHandlerID, logchannel, &channelid);
-			if(errorCode != ERROR_ok)
-			{
-				printf("PLUGIN: Failed to find log channel.\n");
-				return errorCode;
-			}
-			else
-			{
-				errorCode = ts3Functions.requestSendChannelTextMsg(connectionHandlerID, messageText.c_str(), channelid, NULL);
-				if(errorCode != ERROR_ok)
-				{
-					printf("PLUGIN: Failed to post poke.\n");
-					return errorCode;
-				}
-				else
-				{
-					printf("PLUGIN: Poke post success.\n");
-				}
-			}
-		}
-	}
+	/*char* kgb[] = {"PvP_WOG",""};
+	uint64 kgbChannel;
+	ts3Functions.getChannelIDFromChannelNames(serverConnectionHandlerID,kgb, &kgbChannel);
+	ts3Functions.requestSendChannelTextMsg(serverConnectionHandlerID, "Hello", kgbChannel, NULL);
+	*/
 	return ERROR_ok;
 }
 
@@ -1067,6 +1142,12 @@ void chnl_moveFromRt()
 		{
 			printf("PLUGIN: Moved user back to old channel.\n");
 			inRt = FALSE;
+
+			// Check if VAD reactivation is required.
+			if(vadEnabled == TRUE)
+			{
+				hlp_enableVad();
+			}
 		}
 		else
 		{
@@ -1207,7 +1288,15 @@ void vPos_logic(anyID &idClient)
 					}
 					else
 					{
-						hlp_muteClient(idClient);
+						if(players[idClient].isOut == 1)
+						{
+							hlp_unmuteClient(idClient);
+							vPos_infantry(idClient);
+						}
+						else
+						{
+							hlp_muteClient(idClient);
+						}
 					}
 				}
 				else
@@ -1582,7 +1671,7 @@ void hlp_disableMic()
 	}
 }
 
-void hlp_sendPluginCommand(string &commandText, anyID &idClient, BOOL isBroadcast)
+void hlp_sendPluginCommand(string &commandText, anyID idClient, BOOL isBroadcast)
 {
 	if(isBroadcast == TRUE)
 	{
@@ -1618,19 +1707,18 @@ BOOL hlp_majorSelfDataChange()
 int hlp_getChannel(anyID idClient, float clientArray[], float selfArray[], bool isSw) // Возвращает номер МОЕГО канала, на котором я могу слышать игрока
 {
 	int channel;
-
 	for(channel = 0; channel < 4; channel++)
 	{
 		if(isSw == TRUE)
 		{
-			if(clientArray[players[idClient].kvActive] == selfArray[channel] && selfArray[channel] != 0.0f)
+			if(clientArray[players[idClient].kvActive] == selfArray[channel] && selfArray[channel] != 0.0f && self->kvSide == players[idClient].kvSide)
 			{
 				return channel;
 			}
 		}
 		else
 		{
-			if(clientArray[players[idClient].dvActive] == selfArray[channel] && selfArray[channel] != 0.0f)
+			if(clientArray[players[idClient].dvActive] == selfArray[channel] && selfArray[channel] != 0.0f  && self->dvSide == players[idClient].dvSide)
 			{
 				return channel;
 			}
@@ -1651,7 +1739,7 @@ void hlp_timerThread(void* pArguments)
 			timerReset = FALSE;
 		}
 
-		if(ticks > 3 && inRt == TRUE)
+		if(ticks > 5 && inRt == TRUE)
 		{
 			chnl_moveFromRt();
 			timerReset = TRUE;
@@ -1711,15 +1799,6 @@ void prs_commandText(string &commandText, anyID &idClient)
 {
 	int parseCode = commandCheck(commandText, *self, *other, *miniOther);
 
-	if(parseCode != 1)
-	{
-		if(inRt == FALSE)
-		{
-			chnl_moveToRt();
-		}
-		timerReset = TRUE;
-	}
-
 	switch(parseCode)
 	{
 	case 0:
@@ -1758,6 +1837,12 @@ void prs_commandText(string &commandText, anyID &idClient)
 
 void prs_parsePOS()
 {
+	if(inRt == FALSE)
+	{
+		chnl_moveToRt();
+	}
+	timerReset = TRUE;
+
 	string generatedMessage;
 
 	// Check if we are newly joined.
@@ -1804,7 +1889,7 @@ void prs_parsePOS()
 	pos_self();
 
 	// Check if microphone needs to be enabled or disabled.
-	if(self->TAN != 0 && self->talking == FALSE)
+	if(self->TAN != 0 && oldSelf->TAN == 0)
 	{
 		self->talking = TRUE;
 
@@ -1816,13 +1901,16 @@ void prs_parsePOS()
 		// Enable microphone.
 		hlp_enableMic();
 	}
-	else if(self->TAN == 0 && self->talking == TRUE)
+	else if(self->TAN == 0 && oldSelf->TAN != 0)
 	{
 		self->talking = FALSE;
 
 		// Enable VAD if it was disabled.
 		if(vadEnabled == TRUE)
+		{
 			hlp_enableVad();
+			vadEnabled = FALSE;
+		}
 
 		hlp_disableMic();
 	}
