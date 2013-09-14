@@ -121,6 +121,7 @@ void chnl_moveFromRt();
 void msg_generateOTH(string &result);
 void msg_generateREQ(string &result, anyID &targetId);
 void msg_generateMIN(string &result);
+void msg_generateSTT(string &result);
 
 void pos_client(anyID idClient);
 void pos_self();
@@ -160,7 +161,7 @@ const char* ts3plugin_name() {
 }
 
 const char* ts3plugin_version() {
-    return "v0.7.5.2d";
+    return "v0.7.6.1d";
 }
 
 int ts3plugin_apiVersion() {
@@ -359,14 +360,14 @@ void ts3plugin_shutdown()
 
 	printf("PLUGIN: Handling thread shutdown confirmed.\n");
 
-/*	// Await sender thread stop
+	// Await sender thread stop
 	CancelSynchronousIo(senderThreadHndl);
 	while(senderThreadHndl != INVALID_HANDLE_VALUE)
 	{
 		printf("PLUGIN: Awaiting sender thread shutdown.\n");
 		Sleep(100);
 	}
-	printf("PLUGIN: Sender thread shutdown confirmed.\n");*/
+	printf("PLUGIN: Sender thread shutdown confirmed.\n");
 
 	// Await receiver thread stop
 	CancelSynchronousIo(receiverThreadHndl);
@@ -545,6 +546,15 @@ void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int sta
 			string minMessage;
 			msg_generateMIN(minMessage);
 			hlp_sendPluginCommand(minMessage, clientID, TRUE);
+
+			if((status == STATUS_TALKING || status == STATUS_TALKING_WHILE_DISABLED) && self->TAN == 0)
+			{
+				self->talking = 1;
+			}
+			else if(status == STATUS_NOT_TALKING)
+			{
+				self->talking = 0;
+			}
 		}
 		else
 		{
@@ -569,7 +579,7 @@ void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int sta
 					{
 						// Yes he is using SW radio.
 						// Can we hear him at all?
-						if(players[clientID].hearableKV != -1 && self->talking == FALSE)
+						if(players[clientID].hearableKV != -1 && (self->talking == 0 || self->talking == 1))
 						{
 							// Yes we can. Play a SW start beep.
 							// Indicate player as talking via SW.
@@ -594,7 +604,7 @@ void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int sta
 					{
 						// Yes he is using LW radio.
 						// Can we hear him at all?
-						if(players[clientID].hearableDV != -1 && self->talking == FALSE)
+						if(players[clientID].hearableDV != -1 && (self->talking == 0 || self->talking == 1))
 						{
 							// Yes we can. Play a LW start beep.
 							// Indicate player as talking via SW.
@@ -624,7 +634,7 @@ void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int sta
 					{
 						// He was talking via SW radio.
 						// Can we hear him at all?
-						if(players[clientID].hearableKV != -1 && self->talking == FALSE)
+						if(players[clientID].hearableKV != -1 && (self->talking == 0 || self->talking == 1))
 						{
 							// Yes we can. Play the SW beep-out.
 							errorCode = ts3Functions.playWaveFileHandle(connectionHandlerID, beepout_sw, 0, &waveHandle);								
@@ -646,7 +656,7 @@ void ts3plugin_onTalkStatusChangeEvent(uint64 serverConnectionHandlerID, int sta
 					else if (players[clientID].isTalker == 2)
 					{
 						// He was talking via LW radio.
-						if(players[clientID].hearableDV != -1 && self->talking == FALSE)
+						if(players[clientID].hearableDV != -1 && (self->talking == 0 || self->talking == 1))
 						{
 							// Yes we can. Play the LW beep-out.
 							errorCode = ts3Functions.playWaveFileHandle(connectionHandlerID, beepout_lw, 0, &waveHandle);
@@ -1240,6 +1250,40 @@ void msg_generateMIN(string &result)
 		<< self->TAN 		<< ";[/A2TS_ARG]";
 	printf("GENERATION: Generated MIN message.\n");
 	result = minStream.str();
+}
+
+void msg_generateSTT(string &result)
+{
+	int kvArr[4] = {0};
+	int dvArr[4] = {0};
+
+	QHash<anyID, argsComOTH>::iterator i = players.begin();
+	while(i != players.end())
+	{
+		if(players[i.key()].isTalker != 0)
+		{
+			if(players[i.key()].hearableKV != -1)
+			{
+				kvArr[players[i.key()].hearableKV]++;
+			}
+			
+			if(players[i.key()].hearableDV != -1)
+			{
+				dvArr[players[i.key()].hearableDV]++;
+			}
+		}
+		i++;
+	}
+
+	stringstream sttStream;
+	sttStream << "[" << self->talking
+		<< "," << kvArr[0] << ","<< kvArr[1]
+		<< "," << kvArr[2] << "," << kvArr[3]
+		<< "," << dvArr[0] << "," << dvArr[1]
+		<< "," << dvArr[2] << "," << dvArr[3]
+		<< "," << inRt << "]";
+	printf("GENERATION: Generated STT message.\n");
+	result = sttStream.str();
 }
 
 /********************************** Message Generation END *************************************/
@@ -1894,7 +1938,7 @@ void prs_parsePOS()
 	// Check if microphone needs to be enabled or disabled.
 	if(self->TAN != 0 && oldSelf->TAN == 0)
 	{
-		self->talking = TRUE;
+		self->talking = self->TAN + 1;
 
 		// Disable VAD so as not to interfere with microphone functioning.
 		vadEnabled = hlp_checkVad();
@@ -1906,20 +1950,25 @@ void prs_parsePOS()
 	}
 	else if(self->TAN == 0 && oldSelf->TAN != 0)
 	{
-		self->talking = FALSE;
+		self->talking = 0;
 
+		hlp_disableMic();
+		
 		// Enable VAD if it was disabled.
 		if(vadEnabled == TRUE)
 		{
 			hlp_enableVad();
 			vadEnabled = FALSE;
 		}
-
-		hlp_disableMic();
 	}
 
 	// Save data from this iteration for future use.
 	*oldSelf = *self;
+
+	// Send a status reply back to the plug-in.
+	string statusMessage;
+	msg_generateSTT(statusMessage);
+	outgoingMessages.push(statusMessage);
 }
 
 void prs_parseOTH(anyID &idClient)
