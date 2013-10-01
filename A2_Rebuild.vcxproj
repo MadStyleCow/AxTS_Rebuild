@@ -76,8 +76,8 @@
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">debug\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(Platform)\$(Configuration)\</IntDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\</IntDir>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">a2ts_rebuild</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">a2ts_rebuild</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">a2ts_rebuild_win32</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">a2ts_rebuild_win64</TargetName>
     <IgnoreImportLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</IgnoreImportLibrary>
     <IgnoreImportLibrary Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</IgnoreImportLibrary>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">release\</OutDir>
@@ -85,7 +85,7 @@
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(Platform)\$(Configuration)\</IntDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Platform)\$(Configuration)\</IntDir>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">a2ts_rebuild_win32</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">a2ts_rebuild</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">a2ts_rebuild_win64</TargetName>
     <IgnoreImportLibrary Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</IgnoreImportLibrary>
     <IgnoreImportLibrary Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</IgnoreImportLibrary>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</LinkIncremental>
@@ -94,7 +94,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(QTDIR)\include\QtCore;$(QTDIR)\include\QtGui;$(QTDIR)\include;$(QTDIR)\include\ActiveQt;debug;$(QTDIR)\mkspecs\default;C:\Users\PooF\Documents\GitHub\A2TS_Rebuild;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(QTDIR)\include\QtCore;$(QTDIR)\include\QtGui;$(QTDIR)\include;$(QTDIR)\include\ActiveQt;debug;$(QTDIR)\mkspecs\default;C:\Users\PooF\Documents\GitHub\A2TS_Rebuild;.;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>-Zm200 -w34100 -w34189 %(AdditionalOptions)</AdditionalOptions>
       <AssemblerListingLocation>debug\</AssemblerListingLocation>
       <BrowseInformation>false</BrowseInformation>
@@ -113,13 +113,13 @@
       <WarningLevel>Level3</WarningLevel>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>$(QTDIR)\lib\QtGuid4.lib;$(QTDIR)\lib\QtCored4.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(QTDIR)\lib\QtGui4.lib;$(QTDIR)\lib\QtCore4.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(QTDIR)\lib;$(QTDIR)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <DataExecutionPrevention>true</DataExecutionPrevention>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <IgnoreImportLibrary>true</IgnoreImportLibrary>
       <LinkDLL>true</LinkDLL>
-      <OutputFile>$(OutDir)\a2ts_rebuild.dll</OutputFile>
+      <OutputFile>$(OutDir)\a2ts_rebuild_win32.dll</OutputFile>
       <RandomizedBaseAddress>true</RandomizedBaseAddress>
       <SuppressStartupBanner>true</SuppressStartupBanner>
     </Link>
@@ -134,7 +134,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(QTDIR)\include\QtCore;$(QTDIR)\include\QtGui;$(QTDIR)\include;$(QTDIR)\include\ActiveQt;debug;$(QTDIR)\mkspecs\default;C:\Users\PooF\Documents\GitHub\A2TS_Rebuild;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(QTDIR)\include\QtCore;$(QTDIR)\include\QtGui;$(QTDIR)\include;$(QTDIR)\include\ActiveQt;debug;$(QTDIR)\mkspecs\default;C:\Users\PooF\Documents\GitHub\A2TS_Rebuild;.;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>-Zm200 -w34100 -w34189 %(AdditionalOptions)</AdditionalOptions>
       <AssemblerListingLocation>debug\</AssemblerListingLocation>
       <BrowseInformation>false</BrowseInformation>
@@ -153,13 +153,13 @@
       <WarningLevel>Level3</WarningLevel>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>$(QTDIR)\lib\QtGuid4.lib;$(QTDIR)\lib\QtCored4.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(QTDIR)\lib\QtGui4.lib;$(QTDIR)\lib\QtCore4.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(QTDIR)\lib;$(QTDIR)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <DataExecutionPrevention>true</DataExecutionPrevention>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <IgnoreImportLibrary>true</IgnoreImportLibrary>
       <LinkDLL>true</LinkDLL>
-      <OutputFile>$(OutDir)\a2ts_rebuild.dll</OutputFile>
+      <OutputFile>$(OutDir)\a2ts_rebuild_win64.dll</OutputFile>
       <RandomizedBaseAddress>true</RandomizedBaseAddress>
       <SuppressStartupBanner>true</SuppressStartupBanner>
     </Link>
@@ -239,7 +239,7 @@
       <IgnoreImportLibrary>true</IgnoreImportLibrary>
       <LinkDLL>true</LinkDLL>
       <LinkIncremental>false</LinkIncremental>
-      <OutputFile>$(OutDir)\a2ts_rebuild.dll</OutputFile>
+      <OutputFile>$(OutDir)\a2ts_rebuild_win64.dll</OutputFile>
       <RandomizedBaseAddress>true</RandomizedBaseAddress>
       <SuppressStartupBanner>true</SuppressStartupBanner>
     </Link>
@@ -273,7 +273,7 @@
   <ImportGroup Label="ExtensionTargets" />
   <ProjectExtensions>
     <VisualStudio>
-      <UserProperties QtVersion_x0020_Win32="4.8.5" UicDir=".\GeneratedFiles" RccDir=".\GeneratedFiles" QtVersion_x0020_x64="4.8.4x64" />
+      <UserProperties QtVersion_x0020_Win32="qt-485" UicDir=".\GeneratedFiles" RccDir=".\GeneratedFiles" QtVersion_x0020_x64="qt-485-x64" />
     </VisualStudio>
   </ProjectExtensions>
 </Project>

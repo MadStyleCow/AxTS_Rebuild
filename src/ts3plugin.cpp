@@ -161,7 +161,7 @@ const char* ts3plugin_name() {
 }
 
 const char* ts3plugin_version() {
-    return "v0.7.6.1d";
+    return "v0.7.6.2d";
 }
 
 int ts3plugin_apiVersion() {
@@ -761,11 +761,11 @@ void ts3plugin_onCustom3dRolloffCalculationClientEvent(uint64 serverConnectionHa
 			{
 			case 0:
 				// Whisper
-				calculatedVolume = 0.3f - distance * 0.075f; // ~3 meters of hearing range.
+				calculatedVolume = 0.8f - distance * 0.23f; // ~3 meters of hearing range.
 				break;
 			case 1:
 				// Normal
-				calculatedVolume = 0.5f - distance * 0.025f; // ~ 20 meters of hearing range.
+				calculatedVolume = 0.8f - distance * 0.04f; // ~ 20 meters of hearing range.
 				break;
 			case 2:
 				// Screaming
@@ -1851,6 +1851,7 @@ void prs_commandText(string &commandText, anyID &idClient, anyID &targetId)
 		printf("PARSER: Unknown command.\n");
 		break;
 	case 1:
+		printf("%s\n", commandText.c_str());
 		printf("PARSER: Corrupted command text. Failure of regexp validation.\n");
 		break;
 	case 10:

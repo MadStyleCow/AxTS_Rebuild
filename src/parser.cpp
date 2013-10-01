@@ -7,7 +7,7 @@ int commandCheck( std::string messageWS,
 {
    QString messageIN;
    //общее регулярное выражение для команд
-   QRegExp commandRegExp("\\\[A2TS_CMD\\\][a-zA-Z]{3}\\\[\\\/A2TS_CMD\\\](\\\[A2TS_ARG\\\](([0-9]+)|([0-9]+\\\.[0-9]+)|([a-zA-Z0-9]+)|;)*\\\[\\\/A2TS_ARG\\\])?");
+   QRegExp commandRegExp("\\\[A2TS_CMD\\\][a-zA-Z]{3}\\\[\\\/A2TS_CMD\\\](\\\[A2TS_ARG\\\](\\\-?(([0-9]+)|([0-9]+\\\.[0-9]+)|([a-zA-Z0-9]+);))*\\\[\\\/A2TS_ARG\\\])?");
    messageIN = messageWS.c_str();
    if( !commandRegExp.exactMatch( messageIN ) )
    {
