@@ -58,7 +58,7 @@ static struct TS3Functions ts3Functions;
 static char* pluginID = NULL;
 uint64 connectionHandlerID = 0;
 anyID myId = 0;
-char* chname[] = {"PvP_WOG","RT",""};
+char* chname[] = {"PvP_WOG","RT_A3",""};
 char* logchannel[] = {"KGB",""};
 
 // System variables
@@ -91,9 +91,9 @@ BOOL recalcRequired = FALSE;
 BOOL pipeOpen;
 
 // Sound resources
-static char* beepin_lw = "plugins\\A2TS_Rebuild\\sounds\\beep_in_long_stereo.wav";
-static char* beepout_lw = "plugins\\A2TS_Rebuild\\sounds\\rbt_long_stereo.wav";
-static char* beepout_sw = "plugins\\A2TS_Rebuild\\sounds\\rbt_short_stereo.wav";
+static char* beepin_lw = "plugins\\A3TS_Rebuild\\sounds\\beep_in_long_stereo.wav";
+static char* beepout_lw = "plugins\\A3TS_Rebuild\\sounds\\rbt_long_stereo.wav";
+static char* beepout_sw = "plugins\\A3TS_Rebuild\\sounds\\rbt_short_stereo.wav";
 
 /* 
  * ALL CUSTOM FUNCTIONS HAVE SPECIFIC PREFIXES INDICATING WHAT DO THEY DO *
@@ -157,7 +157,7 @@ void RadioNoiseDSP(float slevel, short * samples, int sampleCount);
 /*********************************** Required functions START ************************************/
 
 const char* ts3plugin_name() {
-	return "A2TS Rebuild";
+	return "A3TS Rebuild";
 }
 
 const char* ts3plugin_version() {
@@ -175,7 +175,7 @@ const char* ts3plugin_author() {
 
 const char* ts3plugin_description() {
 	/* If you want to use wchar_t, see ts3plugin_name() on how to use */
-    return "A2TS Rebuild: This plugin will (not) work.";
+    return "A3TS Rebuild: This plugin will (not) work.";
 }
 
 const char* ts3plugin_infoTitle() 
@@ -1094,7 +1094,7 @@ void chnl_moveToRt()
 			if(errorCode != ERROR_ok)
 				printf("PLUGIN: Failed to get channel of client.\n");
 			
-			errorCode = ts3Functions.requestClientMove(connectionHandlerID, myId, newcid, "4321", NULL);
+			errorCode = ts3Functions.requestClientMove(connectionHandlerID, myId, newcid, "372polk_bolk24", NULL);
 			if(errorCode != ERROR_ok)
 				printf("PLUGIN: Failed to requet client move.\n");
 			
@@ -1851,7 +1851,6 @@ void prs_commandText(string &commandText, anyID &idClient, anyID &targetId)
 		printf("PARSER: Unknown command.\n");
 		break;
 	case 1:
-		printf("%s\n", commandText.c_str());
 		printf("PARSER: Corrupted command text. Failure of regexp validation.\n");
 		break;
 	case 10:
