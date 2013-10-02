@@ -58,7 +58,8 @@ static struct TS3Functions ts3Functions;
 static char* pluginID = NULL;
 uint64 connectionHandlerID = 0;
 anyID myId = 0;
-char* chname[] = {"PvP_WOG","RT_A3",""};
+char* chnameArray[] = {"RT_OFP", "RT_AA", "RT_A2", "RT_A3"};
+char* chPasswordArray[] = {"1234", "1234", "4321", "372polk_bolk24"};
 char* logchannel[] = {"KGB",""};
 
 // System variables
@@ -78,7 +79,8 @@ uint64 oldcid = 9999;
 argsComPOS *self; 
 argsComPOS *oldSelf;
 argsComOTH *other; 
-argsComMIN *miniOther; 
+argsComMIN *miniOther;
+argsGameType *gameType;
 QMatrix4x4 trans_matrix;
 
 // Changeable variables
@@ -151,17 +153,18 @@ void prs_parseREQ(anyID &idClient, anyID &targetId);
 void prs_parseMIN(anyID &idClient);
 void prs_parseOTH(anyID &idClient);
 void prs_parsePOS();
+void prs_parseVER();
 
 void RadioNoiseDSP(float slevel, short * samples, int sampleCount);
 
 /*********************************** Required functions START ************************************/
 
 const char* ts3plugin_name() {
-	return "A3TS Rebuild";
+	return "AxTS Rebuild";
 }
 
 const char* ts3plugin_version() {
-    return "v0.7.6.2d";
+    return "v0.8.0";
 }
 
 int ts3plugin_apiVersion() {
@@ -175,7 +178,7 @@ const char* ts3plugin_author() {
 
 const char* ts3plugin_description() {
 	/* If you want to use wchar_t, see ts3plugin_name() on how to use */
-    return "A3TS Rebuild: This plugin will (not) work.";
+    return "AxTS Rebuild: This plugin will (not) work.";
 }
 
 const char* ts3plugin_infoTitle() 
@@ -210,6 +213,7 @@ int ts3plugin_init()
 	other = new argsComOTH();
 	miniOther = new argsComMIN();
 	relativePos = new relativePOS_Struct();
+	gameType = new argsGameType();
 
 	errorCode = connectionHandlerID = ts3Functions.getCurrentServerConnectionHandlerID();
 	if(connectionHandlerID != 0)
@@ -455,7 +459,7 @@ void ts3plugin_onPluginCommandEvent(uint64 serverConnectionHandlerID, const char
 {
 	if(connected == TRUE && inRt == TRUE && serverConnectionHandlerID == connectionHandlerID)
 	{
-		if(strcmp(pluginName, "a2ts_rebuild") != 0)
+		if(strcmp(pluginName, "axts_rebuild") != 0)
 		{
 			printf("PLUGIN: Plugin command event failure.\n");
 		}
@@ -496,7 +500,7 @@ void ts3plugin_onClientMoveEvent(uint64 serverConnectionHandlerID, anyID clientI
 			char* result;
 			if(ts3Functions.getChannelVariableAsString(connectionHandlerID, newChannelID, CHANNEL_NAME, &result) == ERROR_ok)
 			{
-				if(strcmp(result, "RT") != 0)
+				if(strcmp(result, chnameArray[gameType->game]) != 0)
 				{
 					printf("PLUGIN: Switched to a non-RT channel.\n");
 					inRt = FALSE;
@@ -1084,7 +1088,8 @@ void chnl_moveToRt()
 {
 	// Move user to RT channel.
 	int errorCode;
-	errorCode = ts3Functions.getChannelIDFromChannelNames(connectionHandlerID, chname, &newcid);
+	char* rtChannelPath[] = {"PVP_WOG", chnameArray[gameType->game], ""};
+	errorCode = ts3Functions.getChannelIDFromChannelNames(connectionHandlerID, rtChannelPath, &newcid);
 	if(errorCode == ERROR_ok)
 	{
 		if(newcid != NULL)
@@ -1094,7 +1099,7 @@ void chnl_moveToRt()
 			if(errorCode != ERROR_ok)
 				printf("PLUGIN: Failed to get channel of client.\n");
 			
-			errorCode = ts3Functions.requestClientMove(connectionHandlerID, myId, newcid, "372polk_bolk24", NULL);
+			errorCode = ts3Functions.requestClientMove(connectionHandlerID, myId, newcid, chPasswordArray[gameType->game], NULL);
 			if(errorCode != ERROR_ok)
 				printf("PLUGIN: Failed to requet client move.\n");
 			
@@ -1836,14 +1841,14 @@ string hlp_generateMetaData()
 	else
 		pipeState = "No";
 
-	return string(ts3plugin_name()) + string(" ") + string(ts3plugin_version()) + string("\nARMA 2 connected: ") + pipeState; 
+	return string(ts3plugin_name()) + string(" ") + string(ts3plugin_version()) + string("\nGame connected: ") + pipeState; 
 }
 /********************************* Helper Functions END ***************************************/
 
 /********************************* Command Parsing & Processing Functions START ****************************/
 void prs_commandText(string &commandText, anyID &idClient, anyID &targetId)
 {
-	int parseCode = commandCheck(commandText, *self, *other, *miniOther);
+	int parseCode = commandCheck(commandText, *self, *other, *miniOther, *gameType);
 
 	switch(parseCode)
 	{
@@ -1877,6 +1882,10 @@ void prs_commandText(string &commandText, anyID &idClient, anyID &targetId)
 	case 13:
 		printf("PARSER: REQ command parsed.\n");
 		prs_parseREQ(idClient, targetId);	
+		break;
+	case 14:
+		printf("PARSER: VER command parsed.\n");
+		prs_parseVER();
 		break;
 	}
 }
@@ -2049,6 +2058,10 @@ void prs_parseREQ(anyID &idClient, anyID &targetId)
 		msg_generateOTH(othMessage);
 		hlp_sendPluginCommand(othMessage, idClient, TRUE);
 	}
+}
+
+void prs_parseVER()
+{
 }
 
 /**********************89*********** Command Parsing & Processing Functions END ******************************/
