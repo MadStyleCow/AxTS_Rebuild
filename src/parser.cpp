@@ -3,7 +3,8 @@
 int commandCheck( std::string messageWS,
                   argsComPOS &args_pos,
                   argsComOTH &args_oth,
-                  argsComMIN &args_min )
+                  argsComMIN &args_min,
+				  argsGameType &args_gameType)
 {
    QString messageIN;
    //общее регулярное выражение для команд
@@ -433,5 +434,33 @@ int commandCheck( std::string messageWS,
 
 //----------------------------------------------------------------------------//
 //----------------------------------------------------------------------------//
+   if( command == "VER" )
+   {
+	int current_end,
+         current_begin = I_ARGS_POSITION;
+     bool notError = true;
+
+     //парсим аргументы
+	 for( int i = 0; ( i < I_Args_IN_GAMETYPE ) && notError; ++i )
+     {
+       current_end = messageIN.indexOf( ";", current_begin );
+       if ( current_end != -1 )
+       {
+         QString arg = messageIN.mid( current_begin, current_end - current_begin );
+         current_begin = current_end + 1;
+         switch( i )
+         {
+           case 0:
+			   args_gameType.game = arg.toInt( &notError );
+             //заполнение game
+             break;
+
+         } //конец switch
+       }
+     } //конец for для аргументов
+     if( !notError ) return 142; //ошибка преобразования аргумента
+     else return 14; //VER обработан
+   } //конец обработки команды VER
+
    return 0;
 }

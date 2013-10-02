@@ -83,6 +83,11 @@ struct argsComMIN
   int Mode;         //громкость речи (0 – шёпот, 1 – нормальный голос, 2 – крик)
   int TAN;          //Тангента (какую кнопку нажал пользователь) (0 - Голос, 1 - КВ, 2 - ДВ)
 };
+
+struct argsGameType
+{
+	int game;	// Индикатор игры
+};
 #pragma pack(pop)
 
 #define I_COMMAND_POSITION      10      //первый символ команды
@@ -90,6 +95,7 @@ struct argsComMIN
 #define I_ARGS_POSITION         34      //первый символ блока аргументов
 #define I_ARGS_IN_POS           36      //количество аргументов в POS
 #define I_ARGS_IN_OTH           20      //количество аргументов в OTH
+#define I_Args_IN_GAMETYPE		1		// Количество аргументов в GameType
 
 //! Парсер
 /*! Коды возврата:
@@ -106,6 +112,6 @@ struct argsComMIN
     122   - ошибка преобразования аргумента в команде MIN;
     */
 int commandCheck( std::string messageWS, argsComPOS &args_pos,
-                  argsComOTH &args_oth, argsComMIN &args_min );
+                  argsComOTH &args_oth, argsComMIN &args_min, argsGameType &args_type);
 
 #endif // PARSER_H
