@@ -8,7 +8,7 @@ int commandCheck( std::string messageWS,
 {
    QString messageIN;
    //общее регулярное выражение для команд
-   QRegExp commandRegExp("\\\[A2TS_CMD\\\][a-zA-Z]{3}\\\[\\\/A2TS_CMD\\\](\\\[A2TS_ARG\\\](\\\-?(([0-9]+)|([0-9]+\\\.[0-9]+)|([a-zA-Z0-9]+);))*\\\[\\\/A2TS_ARG\\\])?");
+   QRegExp commandRegExp("\\\[AxTS_CMD\\\][a-zA-Z]{3}\\\[\\\/AxTS_CMD\\\](\\\[AxTS_ARG\\\](\\\-?(([0-9]+)|([0-9]+\\\.[0-9]+)|([a-zA-Z0-9]+);))*\\\[\\\/AxTS_ARG\\\])?");
    messageIN = messageWS.c_str();
    if( !commandRegExp.exactMatch( messageIN ) )
    {
@@ -74,65 +74,65 @@ int commandCheck( std::string messageWS,
 
              //#################=KV=0=#####################
            case 7:
-             args_pos.kvChan0 = arg.toFloat( &notError );
+			 args_pos.kvChanArray[0] = arg.toFloat( &notError );
              //заполнение kvChan0
              break;
 
            case 8:
-             args_pos.kvVol0 = arg.toFloat( &notError );
+             args_pos.kvVolArray[0] = arg.toFloat( &notError );
              //заполнение kvVol0
              break;
 
            case 9:
-             args_pos.kvPos0 = arg.toInt( &notError, 10 );
+             args_pos.kvPosArray[0] = arg.toInt( &notError, 10 );
              //заполнение kvPos0
              break;
 
              //#################=KV=1=#####################
            case 10:
-             args_pos.kvChan1 = arg.toFloat( &notError );
+             args_pos.kvChanArray[1] = arg.toFloat( &notError );
              //заполнение kvChan1
              break;
 
            case 11:
-             args_pos.kvVol1 = arg.toFloat( &notError );
+             args_pos.kvVolArray[1] = arg.toFloat( &notError );
              //заполнение kvVol1
              break;
 
            case 12:
-             args_pos.kvPos1 = arg.toInt( &notError, 10 );
+             args_pos.kvPosArray[1] = arg.toInt( &notError, 10 );
              //заполнение kvPos1
              break;
 
              //#################=KV=2=#####################
            case 13:
-             args_pos.kvChan2 = arg.toFloat( &notError );
+             args_pos.kvChanArray[2] = arg.toFloat( &notError );
              //заполнение kvChan2
              break;
 
            case 14:
-             args_pos.kvVol2 = arg.toFloat( &notError );
+             args_pos.kvVolArray[2] = arg.toFloat( &notError );
              //заполнение kvVol2
              break;
 
            case 15:
-             args_pos.kvPos2 = arg.toInt( &notError, 10 );
+             args_pos.kvPosArray[2] = arg.toInt( &notError, 10 );
              //заполнение kvPos2
              break;
 
              //#################=KV=3=#####################
            case 16:
-             args_pos.kvChan3 = arg.toFloat( &notError );
+             args_pos.kvChanArray[3] = arg.toFloat( &notError );
              //заполнение kvChan3
              break;
 
            case 17:
-             args_pos.kvVol3 = arg.toFloat( &notError );
+             args_pos.kvVolArray[3] = arg.toFloat( &notError );
              //заполнение kvVol3
              break;
 
            case 18:
-             args_pos.kvPos3 = arg.toInt( &notError, 10 );
+             args_pos.kvPosArray[3] = arg.toInt( &notError, 10 );
              //заполнение kvPos3
              break;
 
@@ -148,65 +148,65 @@ int commandCheck( std::string messageWS,
 
              //#################=DV=0=#####################
            case 21:
-             args_pos.dvChan0 = arg.toFloat( &notError );
+			 args_pos.dvChanArray[0] = arg.toFloat( &notError );
              //заполнение dvChan0
              break;
 
            case 22:
-             args_pos.dvVol0 = arg.toFloat( &notError );
+             args_pos.dvVolArray[0] = arg.toFloat( &notError );
              //заполнение dvVol0
              break;
 
            case 23:
-             args_pos.dvPos0 = arg.toInt( &notError, 10 );
+             args_pos.dvPosArray[0] = arg.toInt( &notError, 10 );
              //заполнение dvPos0
              break;
 
              //#################=DV=1=#####################
            case 24:
-             args_pos.dvChan1 = arg.toFloat( &notError );
+             args_pos.dvChanArray[1] = arg.toFloat( &notError );
              //заполнение dvChan1
              break;
 
            case 25:
-             args_pos.dvVol1 = arg.toFloat( &notError );
+             args_pos.dvVolArray[1] = arg.toFloat( &notError );
              //заполнение dvVol1
              break;
 
            case 26:
-             args_pos.dvPos1 = arg.toInt( &notError, 10 );
+             args_pos.dvPosArray[1] = arg.toInt( &notError, 10 );
              //заполнение dvPos1
              break;
 
              //#################=DV=2=#####################
            case 27:
-             args_pos.dvChan2 = arg.toFloat( &notError );
+             args_pos.dvChanArray[2] = arg.toFloat( &notError );
              //заполнение dvChan2
              break;
 
            case 28:
-             args_pos.dvVol2 = arg.toFloat( &notError );
+             args_pos.dvVolArray[2] = arg.toFloat( &notError );
              //заполнение dvVol2
              break;
 
            case 29:
-             args_pos.dvPos2 = arg.toInt( &notError, 10 );
+             args_pos.dvPosArray[2] = arg.toInt( &notError, 10 );
              //заполнение dvPos2
              break;
 
              //#################=DV=3=#####################
            case 30:
-             args_pos.dvChan3 = arg.toFloat( &notError );
+             args_pos.dvChanArray[3] = arg.toFloat( &notError );
              //заполнение dvChan3
              break;
 
            case 31:
-             args_pos.dvVol3 = arg.toFloat( &notError );
+             args_pos.dvVolArray[3] = arg.toFloat( &notError );
              //заполнение dvVol3
              break;
 
            case 32:
-             args_pos.dvPos3 = arg.toInt( &notError, 10 );
+             args_pos.dvPosArray[3] = arg.toInt( &notError, 10 );
              //заполнение dvPos3
              break;
 
@@ -289,25 +289,25 @@ int commandCheck( std::string messageWS,
 
              //#################=KV=0=#####################
            case 7:
-             args_oth.kvChan0 = arg.toFloat( &notError );
+             args_oth.kvChanArray[0] = arg.toFloat( &notError );
              //заполнение kvChan0
              break;
 
              //#################=KV=1=#####################
            case 8:
-             args_oth.kvChan1 = arg.toFloat( &notError );
+             args_oth.kvChanArray[1] = arg.toFloat( &notError );
              //заполнение kvChan1
              break;
 
              //#################=KV=2=#####################
            case 9:
-             args_oth.kvChan2 = arg.toFloat( &notError );
+             args_oth.kvChanArray[2] = arg.toFloat( &notError );
              //заполнение kvChan2
              break;
 
              //#################=KV=3=#####################
            case 10:
-             args_oth.kvChan3 = arg.toFloat( &notError );
+             args_oth.kvChanArray[3] = arg.toFloat( &notError );
              //заполнение kvChan3
              break;
 
@@ -323,25 +323,25 @@ int commandCheck( std::string messageWS,
 
              //#################=DV=0=#####################
            case 13:
-             args_oth.dvChan0 = arg.toFloat( &notError );
+             args_oth.dvChanArray[0] = arg.toFloat( &notError );
              //заполнение dvChan0
              break;
 
              //#################=DV=1=#####################
            case 14:
-             args_oth.dvChan1 = arg.toFloat( &notError );
+             args_oth.dvChanArray[1] = arg.toFloat( &notError );
              //заполнение dvChan1
              break;
 
              //#################=DV=2=#####################
            case 15:
-             args_oth.dvChan2 = arg.toFloat( &notError );
+             args_oth.dvChanArray[2] = arg.toFloat( &notError );
              //заполнение dvChan2
              break;
 
              //#################=DV=3=#####################
            case 16:
-             args_oth.dvChan3 = arg.toFloat( &notError );
+             args_oth.dvChanArray[3] = arg.toFloat( &notError );
              //заполнение dvChan3
              break;
 
@@ -454,7 +454,6 @@ int commandCheck( std::string messageWS,
 			   args_gameType.game = arg.toInt( &notError );
              //заполнение game
              break;
-
          } //конец switch
        }
      } //конец for для аргументов
